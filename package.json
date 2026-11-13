@@ -11,7 +11,8 @@
     "autoplay": "node tests/autoplay.mjs",
     "test:mobile": "node tests/mobile.mjs",
     "test:boss": "START=boss node tests/autoplay.mjs",
-    "assets": "python3 tools/make_hero.py && python3 tools/make_world.py && python3 tools/make_audio.py && python3 tools/make_extras.py"
+    "assets": "python3 tools/make_hero.py && node tools/pack_hero.mjs && python3 tools/make_world.py && python3 tools/make_audio.py && python3 tools/make_extras.py && bash tools/compress_pngs.sh",
+    "assets:hero": "python3 tools/make_hero.py && node tools/pack_hero.mjs"
   },
   "keywords": [],
   "author": "",

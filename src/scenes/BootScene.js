@@ -12,7 +12,7 @@ export default class BootScene extends Phaser.Scene {
     this.load.on('progress', (p) => { bar.width = 200 * p; });
 
     this.load.setPath('assets/');
-    this.load.spritesheet('hero', 'hero.png', { frameWidth: 64, frameHeight: 56 });
+    this.load.atlas('hero', 'hero.png', 'hero.json');
     this.load.spritesheet('slime', 'slime.png', { frameWidth: 32, frameHeight: 32 });
     this.load.spritesheet('coin', 'coin.png', { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('portal', 'portal.png', { frameWidth: 48, frameHeight: 64 });
@@ -34,11 +34,13 @@ export default class BootScene extends Phaser.Scene {
   create() {
     const a = (key, frames, frameRate, repeat = -1) =>
       this.anims.create({ key, frames: this.anims.generateFrameNumbers(frames[0], { frames: frames[1] }), frameRate, repeat });
-    a('hero-idle', ['hero', [0, 1]], 3);
-    a('hero-walk', ['hero', [2, 3, 4, 5]], 9);
-    a('hero-jump', ['hero', [6]], 1);
-    a('hero-attack', ['hero', [7, 8, 9]], 18, 0);
-    a('hero-hurt', ['hero', [10]], 1);
+    const an = (key, prefix, start, end, frameRate, repeat = -1) =>
+      this.anims.create({ key, frames: this.anims.generateFrameNames('hero', { prefix, start, end }), frameRate, repeat });
+    an('hero-idle', 'hero-idle-', 0, 1, 3);
+    an('hero-walk', 'hero-walk-', 0, 7, 12);
+    an('hero-jump', 'hero-jump-', 0, 0, 1);
+    an('hero-attack', 'hero-attack-', 0, 2, 18, 0);
+    an('hero-hurt', 'hero-hurt-', 0, 0, 1);
     a('slime-idle', ['slime', [0, 1]], 3);
     a('slime-crouch', ['slime', [2]], 1, 0);
     a('slime-air', ['slime', [3]], 1, 0);

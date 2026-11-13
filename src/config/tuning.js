@@ -16,7 +16,7 @@ export const PHYS = {
 
 export const COMBAT = {
   attackCooldownMs: 300,
-  attackActiveFrames: [8, 9],  // hero sheet frames where the sword hurts
+  attackActiveFrames: ['hero-attack-1', 'hero-attack-2'],  // atlas frames where the sword hurts
   attackReach: 34,
   hitStopMs: 70,
   shakeHit: [90, 0.006],

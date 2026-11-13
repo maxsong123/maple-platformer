@@ -7,7 +7,7 @@ import { PHYS, COMBAT } from '../config/tuning.js';
  */
 export default class Player extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, stats, input) {
-    super(scene, x, y, 'hero', 0);
+    super(scene, x, y, 'hero', 'hero-idle-0');
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.stats = stats;
@@ -39,8 +39,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     const hurtLock = time < this.hurtLockUntil;
 
     // ── horizontal: accelerate toward target speed, snappy turnarounds
-    const dir = (inp.right() ? 1 : 0) - (inp.left() ? 1 : 0);
-    const target = dir * this.stats.speed * (this.attacking && this.grounded ? 0.35 : 1);
+    const axis = inp.moveAxis ? inp.moveAxis() : ((inp.right() ? 1 : 0) - (inp.left() ? 1 : 0));
+    const dir = Math.sign(axis);
+    const target = axis * this.stats.speed * (this.attacking && this.grounded ? 0.35 : 1);
     if (!hurtLock) {
       const accel = this.grounded ? PHYS.accelGround : PHYS.accelAir;
       const dv = target - b.velocity.x;
@@ -99,7 +100,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   swordHitbox() {
     if (!this.attacking) return null;
     const f = this.anims.currentFrame && this.anims.currentFrame.textureFrame;
-    if (!COMBAT.attackActiveFrames.includes(Number(f))) return null;
+    if (!COMBAT.attackActiveFrames.includes(f) && !COMBAT.attackActiveFrames.includes(Number(f))) return null;
     const w = COMBAT.attackReach, h = 34;
     const x = this.facing > 0 ? this.x + 4 : this.x - 4 - w;
     return new Phaser.Geom.Rectangle(x, this.y - 18, w, h);

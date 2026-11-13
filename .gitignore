@@ -31,3 +31,9 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# generated hero frames / packer project / previews (rebuild with npm run assets:hero)
+tools/hero-frames/
+tools/hero.ftpp
+tools/hero-preview.png
+tools/walk-preview.png
