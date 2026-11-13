@@ -23,7 +23,7 @@ In another:
 ```bash
 npm run autoplay                  # full level + boss + checkpoint respawn; writes shots/*.png
 npm run test:boss                 # START=boss, starts at the pre-boss checkpoint
-npm run test:mobile               # iPhone 13 landscape touch / multitouch / rotate prompt
+npm run test:mobile               # iPhone 13 landscape+portrait: joystick, multitouch, rotate prompt
 ```
 
 Optional: `URL=https://... npm run autoplay` against a preview deploy. `TIMEOUT` (ms) and `STATS` (JSON) are also honored by autoplay. Do not commit the large `shots/*.mp4` videos the tests may write; PNG screenshots in `shots/` are fine.
@@ -42,14 +42,14 @@ src/
     Slime.js              Hopping slime (and King Slime minis)
     KingSlime.js          Mini-boss: telegraph → slam / charge / summon; enrages at 50% HP
     Checkpoint.js         Flag; respawn point
-    Controls.js           Keyboard + touch input facade
-    TouchState.js         Shared touch button state + isTouchDevice()
+    Controls.js           Keyboard + touch input facade (moveAxis for analog stick)
+    TouchState.js         Shared touch/joystick state, TOUCH_UI layout, isTouchDevice()
   scenes/
     BootScene.js          Loads assets from public/assets/, then Title
     TitleScene.js         Tap / Space to start; launches Game + HUD + Touch
     GameScene.js          Level, collisions, combat, boss fight, portal, run state
     HUDScene.js           Hearts, coins, XP, boss bar
-    TouchScene.js         On-screen buttons (shown on touch devices)
+    TouchScene.js         Virtual joystick (left) + JUMP/ATK buttons (right); touch devices only
     LevelCompleteScene.js Results / stars / XP
   fx/Juice.js             Hit-stop, camera shake, damage numbers, puffs, sparkles
 public/assets/            Sprites, tiles, backgrounds, fonts, sfx (ogg + mp3)
@@ -59,7 +59,7 @@ tests/                    Playwright: autoplay.mjs, mobile.mjs, smoke.mjs, hit.m
 
 ## Architecture
 
-- **Scenes.** `BootScene` preloads everything under `assets/` (Vite serves `public/`). `TitleScene` starts `Game`, `HUD`, and (on touch, or with `?touch`) `Touch`. `GameScene` owns the run: builds the tilemap from `buildLevel1()`, spawns the player / slimes / coins / flags / King Slime / portal, and drives combat + juice. On K.O. the player respawns at the last raised checkpoint with full hearts; coins and kills are kept. The goal portal stays locked until King Slime is dead. `window.__game` and `?debug` → `window.__debug` exist for tests.
+- **Scenes.** `BootScene` preloads everything under `assets/` (Vite serves `public/`). The hero is a Phaser JSON-hash atlas (`hero.png` + `hero.json`); other sheets are still frame-width spritesheets. `TitleScene` starts `Game`, `HUD`, and (on touch, or with `?touch`) `Touch`. `GameScene` owns the run: builds the tilemap from `buildLevel1()`, spawns the player / slimes / coins / flags / King Slime / portal, and drives combat + juice. On K.O. the player respawns at the last raised checkpoint with full hearts; coins and kills are kept. The goal portal stays locked until King Slime is dead. `window.__game` and `?debug` → `window.__debug` exist for tests.
 - **Player.** `Player` uses arcade physics and `PHYS` (coyote time, jump buffer, variable jump cut). Attack reach, cooldown, invuln, and knockback come from `COMBAT`. Current power (HP, attack, crit, speed, jump, luck) must be read from `getPlayerStats()` — GameScene already does this. Do not hard-code a second copy of those numbers in Player or the HUD.
 - **Enemies.** Regular slimes use `ENEMY.slime`. `KingSlime` uses `BOSS`: a telegraph ("!") then slam (shockwaves), charge (dizzy if it hits a wall, 1.5x damage), or summon. Enrage at half health speeds wind-ups and shockwaves and adds minis. Dying during `fight === 'active'` resets the fight. Mini slimes are `Slime` instances with `mini: true` and `BOSS.mini` stats.
 - **Level format.** `src/levels/level1.js` is an array of 12-row ASCII segments. Legend: `#` ground, `=` one-way ledge, `o` coin, `s` slime, `P` start, `G` portal, `C` checkpoint, `K` King Slime, `A` arena gate, `.` empty. Remix by editing segments; keep the start, two checkpoints, arena, and portal unless you mean to change the loop.
@@ -76,19 +76,25 @@ Sprites and SFX are generated, then checked into `public/assets/` so the game ru
 ```bash
 npm run assets
 # which is:
-#   python3 tools/make_hero.py      # public/assets/hero.png  (64x56 frames)
+#   python3 tools/make_hero.py      # tools/hero-frames/*.png  (64x56 named frames, 8-frame walk)
+#   node tools/pack_hero.mjs        # packs frames via free-tex-packer-cli → public/assets/hero.png + hero.json (Phaser JSON hash)
 #   python3 tools/make_world.py     # tiles, backgrounds, coin, portal, slime, slash, hearts, …
 #   python3 tools/make_audio.py     # public/assets/sfx/*.ogg and *.mp3
 #   python3 tools/make_extras.py    # kingslime, flag, shock, crown, boss/checkpoint SFX
+#   bash tools/compress_pngs.sh     # pngquant --quality=80-95 then optipng -o2
 ```
 
-Needs Python 3 with numpy and Pillow (`pip install numpy pillow`). After regenerating, eyeball `public/assets/` and play a short run before committing. If you change frame sizes, update the `spritesheet` frameWidth/frameHeight in `BootScene.js` to match.
+`npm run assets:hero` rebuilds only the hero atlas (make_hero + pack).
+
+Needs Python 3 with numpy and Pillow (`pip install numpy pillow`), plus `free-tex-packer-cli`, `pngquant`, and `optipng` on PATH. After regenerating, eyeball `public/assets/` and play a short run before committing. The hero is an atlas: change frame *names* (`hero-idle-0`, `hero-walk-0..7`, `hero-jump-0`, `hero-attack-0..2`, `hero-hurt-0`) and `COMBAT.attackActiveFrames`, not a frameWidth. Other sheets still use `frameWidth`/`frameHeight` in `BootScene.js`.
+
+Walk frames are authored in `tools/make_hero.py` (Pillow: concept-pose bodies, boot stamps, cape sway, body bob, procedural sword — the sword must stay visible in every frame). LibreSprite 1.3 (`/opt/appimages/libresprite-v1.3-linux-x86_64.AppImage --batch`) works headless and is the right tool for later onion-skin polish of `tools/hero-frames/*.png`; the shipping atlas is always packed with free-tex-packer-cli, not LibreSprite. Do not trim or rotate hero frames (body box and feet depend on untrimmed 64x56).
 
 ## Conventions
 
 - Small, focused commits. One idea per commit. Do not commit `dist/`, `node_modules/`, `*.zip`, `deploy-payload/`, `.vercel/`, or large `shots/*.mp4`.
 - `git pull --rebase origin main` (or pull + merge) before you start, and again before you push if someone else may have pushed.
 - Keep stats flowing through `getPlayerStats()`. Put new feel knobs in `tuning.js`, not scattered through objects.
-- Keyboard and touch should both keep working. `Controls` + `TouchState` + `TouchScene` are the input path; `?touch` / `?notouch` are useful for testing.
+- Keyboard and touch should both keep working. `Controls` + `TouchState` + `TouchScene` are the input path; `?touch` / `?notouch` are useful for testing. The left virtual stick is analog (dead-zoned `touch.axisX`) and must never jump — jump is the JUMP button (or Space/Up/W). Stick up is ignored. Multi-touch: hold the stick and tap JUMP/ATK with a second finger. The stick floats (first touch in the left 45% of the screen recenters the base under the thumb).
 - Do not add secrets, tokens, or Vercel share links to the repo. The Vercel project is `maple-platformer` (`prj_VLihUhEWkCHOMpV9F7kNeGipFbzF`); do not change its production/target settings unless Max asked.
 - Prefer editing the source and letting Vite rebuild over hand-editing `dist/`.
