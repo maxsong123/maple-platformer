@@ -20,6 +20,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.facing = 1;
     this.lastGroundedAt = 0;
     this.jumpPressedAt = -9999;
+    this.jumpsUsed = 0;
     this.attacking = false;
     this.lastAttackAt = -9999;
     this.invulnUntil = 0;
@@ -51,18 +52,25 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     }
     this.setFlipX(this.facing < 0);
 
-    // ── jump: coyote time + input buffer + variable height
-    if (this.grounded) this.lastGroundedAt = time;
+    // ── jump: coyote time + input buffer + variable height + multi-jump (double jump)
+    if (this.grounded) { this.lastGroundedAt = time; this.jumpsUsed = 0; }
     if (inp.jumpPressed()) this.jumpPressedAt = time;
     const canCoyote = time - this.lastGroundedAt <= PHYS.coyoteMs;
     const buffered = time - this.jumpPressedAt <= PHYS.jumpBufferMs;
-    if (buffered && canCoyote && !hurtLock) {
-      b.setVelocityY(-this.stats.jump);
-      this.jumpPressedAt = -9999;
-      this.lastGroundedAt = -9999;
-      this.scene.juice.sfx('jump', { volume: 0.35 });
-      this.squash(0.8, 1.2);
-      this.scene.juice.puff(this.x, this.y + 24, 0.5);
+    const maxJumps = this.stats.maxJumps || 1;
+    if (buffered && !hurtLock && this.jumpsUsed < maxJumps) {
+      const fromGround = this.jumpsUsed === 0 && canCoyote;
+      if (fromGround || !this.grounded) {
+        const airJump = !fromGround;
+        b.setVelocityY(-this.stats.jump * (airJump ? 0.92 : 1));
+        this.jumpsUsed = fromGround ? 1 : this.jumpsUsed + 1;
+        this.jumpPressedAt = -9999;
+        this.lastGroundedAt = -9999;
+        this.scene.juice.sfx('jump', { volume: 0.35, rate: airJump ? 1.3 : 1 });
+        this.squash(0.8, 1.2);
+        this.scene.juice.puff(this.x, this.y + 24, airJump ? 0.7 : 0.5);
+        if (airJump) this.scene.juice.sparkleBurst(this.x, this.y + 18, 7);
+      }
     }
     if (!inp.jumpHeld() && b.velocity.y < -120) b.setVelocityY(b.velocity.y * PHYS.jumpCutMultiplier);
 
@@ -86,6 +94,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         sl.play('slash'); sl.once('animationcomplete', () => sl.destroy());
       });
     }
+
+    // ── ranged: fling a throwing star (the scene checks ammo + cooldown)
+    if (inp.rangedPressed() && !hurtLock) this.scene.throwStar(time);
 
     // ── animation state
     if (time < this.invulnUntil) this.setAlpha(Math.floor(time / 70) % 2 ? 0.35 : 1); else this.setAlpha(1);

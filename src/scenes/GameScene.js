@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { TILE, GAME_W, GAME_H, COMBAT, ENEMY, PROGRESSION, BOSS, CHECKPOINT } from '../config/tuning.js';
 import { getPlayerStats } from '../config/stats.js';
+import { ITEMS, RANGED } from '../config/items.js';
 import { buildLevel1 } from '../levels/level1.js';
+import Inventory from '../objects/Inventory.js';
 import Player from '../objects/Player.js';
 import Slime from '../objects/Slime.js';
 import KingSlime from '../objects/KingSlime.js';
@@ -28,6 +30,9 @@ export default class GameScene extends Phaser.Scene {
     this.completed = false;
     this.fight = 'none'; // none | active | won
     this.shocks = [];
+    this.inv = new Inventory();
+    this.stars = [];         // live throwing-star projectiles
+    this.lastStarAt = -9999;
 
     const rows = this.level.rows;
     const W = rows[0].length * TILE, H = rows.length * TILE;
@@ -56,6 +61,8 @@ export default class GameScene extends Phaser.Scene {
 
     this.input.keyboard.on('keydown-M', () => this.toggleMute());
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
+    this.input.keyboard.on('keydown-ONE', () => this.useItem('potion'));
+    this.input.keyboard.on('keydown-TWO', () => this.useItem('elixir'));
 
     // debug hooks for automated testing (?debug)
     if (new URLSearchParams(location.search).has('debug')) {
@@ -116,6 +123,7 @@ export default class GameScene extends Phaser.Scene {
     this.checkpoints = [];
     this.coins = this.physics.add.group({ allowGravity: false, immovable: true });
     this.drops = this.physics.add.group();
+    this.items = this.physics.add.group({ allowGravity: false, immovable: true });
     this.totalCoins = 0;
     rows.forEach((r, y) => [...r].forEach((ch, x) => {
       const wx = x * TILE + TILE / 2, wy = y * TILE + TILE / 2;
@@ -126,6 +134,9 @@ export default class GameScene extends Phaser.Scene {
         this.tweens.add({ targets: c, y: wy - 3, yoyo: true, repeat: -1, duration: 600 + (x % 3) * 80, ease: 'Sine.InOut' });
         this.totalCoins++;
       }
+      if (ch === 'h') this.spawnItem(wx, wy, 'potion');
+      if (ch === 'e') this.spawnItem(wx, wy, 'elixir');
+      if (ch === 't') this.spawnItem(wx, wy, 'star');
       if (ch === 's') this.slimes.push(new Slime(this, wx, wy, this.layer));
       if (ch === 'C') this.checkpoints.push(new Checkpoint(this, wx, (y + 1) * TILE, this.checkpoints.length));
       if (ch === 'K') this.bossHome = { x: wx, y: wy - 30 };
@@ -163,6 +174,7 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.drops, this.layer);
     this.physics.add.overlap(this.player, this.coins, (p, c) => this.collectCoin(c));
     this.physics.add.overlap(this.player, this.drops, (p, c) => { if (c.getData('ready')) this.collectCoin(c); });
+    this.physics.add.overlap(this.player, this.items, (p, it) => this.collectItem(it));
     this.physics.add.overlap(this.player, this.portal, () => this.tryPortal());
   }
 
@@ -204,6 +216,96 @@ export default class GameScene extends Phaser.Scene {
     this.run.coins++;
     this.gainXp(PROGRESSION.xpPerCoin);
     this.events.emit('hud');
+  }
+
+  // ───────────── items + inventory ─────────────
+  spawnItem(x, y, type) {
+    const def = ITEMS[type];
+    const it = this.items.create(x, y, def.icon).setDepth(12).setData('item', type);
+    it.body.setSize(16, 16).setAllowGravity(false);
+    this.tweens.add({ targets: it, y: y - 4, yoyo: true, repeat: -1, duration: 720, ease: 'Sine.InOut' });
+    if (type === 'star') this.tweens.add({ targets: it, angle: 360, repeat: -1, duration: 1300 });
+    else this.tweens.add({ targets: it, scale: { from: 0.92, to: 1.08 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.InOut' });
+    return it;
+  }
+
+  collectItem(it) {
+    if (!it.active) return;
+    const type = it.getData('item'), def = ITEMS[type];
+    const n = type === 'star' ? def.pickup : 1;
+    this.inv.add(type, n);
+    this.tweens.killTweensOf(it);
+    this.tweens.add({ targets: it, y: it.y - 18, scale: 1.6, alpha: 0, duration: 260, ease: 'Cubic.Out', onComplete: () => it.destroy() });
+    this.juice.sparkleBurst(it.x, it.y, 7);
+    this.juice.sfx('select', { volume: 0.5, rate: 1.1 });
+    this.juice.floatText(it.x, it.y - 28, type === 'star' ? `+${n} STARS` : def.name.toUpperCase(), '#9ff2e6', 8);
+    this.events.emit('hud');
+  }
+
+  /** Consume a usable item (potion/elixir) to heal. Called by hotkeys 1/2 and HUD taps. */
+  useItem(type) {
+    if (this.completed || !this.player || this.player.dead) return;
+    const def = ITEMS[type];
+    if (!def || !def.usable) return;
+    if (this.inv.count(type) <= 0) {
+      this.juice.floatText(this.player.x, this.player.y - 40, 'NONE LEFT', '#ffb3c1', 8);
+      return;
+    }
+    if (this.player.hp >= this.stats.maxHp) {
+      this.juice.floatText(this.player.x, this.player.y - 40, 'HP FULL', '#ffe066', 8);
+      return;
+    }
+    this.inv.take(type);
+    const healed = Math.min(def.heal, this.stats.maxHp - this.player.hp);
+    this.player.hp = Math.min(this.stats.maxHp, this.player.hp + def.heal);
+    this.juice.sfx('levelup', { volume: 0.45, rate: 1.1 });
+    this.juice.sparkleBurst(this.player.x, this.player.y, 12);
+    this.juice.floatText(this.player.x, this.player.y - 44, `+${healed}`, '#9dff7a', 12);
+    this.cameras.main.flash(120, 120, 255, 150);
+    this.events.emit('hud');
+  }
+
+  // ───────────── ranged: throwing stars ─────────────
+  throwStar(time) {
+    if (this.completed || this.player.dead) return;
+    if (time - this.lastStarAt < RANGED.cooldownMs) return;
+    if (!this.inv.take('star')) {
+      this.juice.floatText(this.player.x, this.player.y - 40, 'NO STARS', '#ffb3c1', 8);
+      this.juice.sfx('select', { volume: 0.25, rate: 0.7 });
+      return;
+    }
+    this.lastStarAt = time;
+    const p = this.player, dir = p.facing;
+    const spr = this.add.sprite(p.x + dir * 16, p.y - 4, 'star_item').setDepth(22);
+    this.stars.push({ spr, dir, speed: RANGED.speed, dmg: this.stats.attack * RANGED.dmgMult, until: time + RANGED.lifeMs, hit: new Set() });
+    this.juice.sfx('swing', { volume: 0.4, rate: 1.35 });
+    this.events.emit('hud');
+  }
+
+  updateStars(time, delta) {
+    if (!this.stars.length) return;
+    const dt = delta / 1000;
+    for (const st of this.stars) {
+      st.spr.x += st.dir * st.speed * dt;
+      st.spr.angle += st.dir * 26;
+      const sr = new R(st.spr.x - 7, st.spr.y - 7, 14, 14);
+      let gone = time > st.until || st.spr.x < 4 || st.spr.x > this.worldW - 4;
+      if (!gone) {
+        const tile = this.layer.getTileAtWorldXY(st.spr.x, st.spr.y);
+        if (tile && tile.index >= T.GL && tile.index <= T.DR) gone = true; // solid ground (ledges let stars pass)
+      }
+      if (!gone) {
+        for (const s of this.slimes) {
+          if (s.dead || st.hit.has(s)) continue;
+          if (hits(sr, s.getBounds())) { st.hit.add(s); this.hitSlime(s, time, st.dmg); gone = true; break; }
+        }
+      }
+      if (!gone && this.boss && this.fight === 'active' && !this.boss.dead && hits(sr, this.bodyRect(this.boss))) {
+        this.hitBoss(time, st.dmg, false); gone = true;
+      }
+      if (gone) { this.juice.puff(st.spr.x, st.spr.y, 0.4); st.spr.destroy(); st.dead = true; }
+    }
+    this.stars = this.stars.filter((s) => !s.dead);
   }
 
   gainXp(n) {
@@ -266,6 +368,9 @@ export default class GameScene extends Phaser.Scene {
 
     // boss fight
     if (this.boss) this.updateBoss(time, delta, hb, pr);
+
+    // thrown stars
+    this.updateStars(time, delta);
 
     // fell in a pit
     if (p.y > this.worldH + 40 && !p.dead) {
@@ -342,10 +447,10 @@ export default class GameScene extends Phaser.Scene {
     this.slimes.push(s);
   }
 
-  hitBoss(time) {
+  hitBoss(time, baseAtk = this.stats.attack, melee = true) {
     const k = this.boss;
     const crit = Math.random() < this.stats.critChance;
-    const dmg = Math.round(this.stats.attack * Phaser.Math.FloatBetween(0.85, 1.2) * (crit ? 1.6 : 1) * (k.state === 'dizzy' ? 1.5 : 1));
+    const dmg = Math.round(baseAtk * Phaser.Math.FloatBetween(0.85, 1.2) * (crit ? 1.6 : 1) * (k.state === 'dizzy' ? 1.5 : 1));
     const r = k.damage(dmg);
     this.juice.damageNumber(k.x + Phaser.Math.Between(-10, 10), k.y - 50, dmg, crit ? 'purple' : 'orange', true);
     this.juice.flash(k);
@@ -353,8 +458,8 @@ export default class GameScene extends Phaser.Scene {
     this.juice.shake(crit ? [140, 0.01] : COMBAT.shakeHit);
     this.juice.sfx('hit', { volume: 0.65, rate: crit ? 0.8 : Phaser.Math.FloatBetween(0.85, 1) });
     this.juice.sparkleBurst(k.x, k.y, 5);
-    // small push-back so you don't get body-checked right after hitting
-    this.player.body.setVelocityX(this.player.x < k.x ? -140 : 140);
+    // small push-back so you don't get body-checked right after a melee hit (not on ranged)
+    if (melee) this.player.body.setVelocityX(this.player.x < k.x ? -140 : 140);
     this.events.emit('boss', { hp: k.hp });
     if (r.enragedNow) this.enrage();
     if (r.killed) this.killBoss();
@@ -457,9 +562,9 @@ export default class GameScene extends Phaser.Scene {
 
   bodyRect(o) { const b = o.body; return new R(b.x, b.y, b.width, b.height); }
 
-  hitSlime(s, time) {
+  hitSlime(s, time, baseAtk = this.stats.attack) {
     const crit = Math.random() < this.stats.critChance;
-    const dmg = Math.round(this.stats.attack * Phaser.Math.FloatBetween(0.85, 1.2) * (crit ? 1.6 : 1));
+    const dmg = Math.round(baseAtk * Phaser.Math.FloatBetween(0.85, 1.2) * (crit ? 1.6 : 1));
     const killed = s.damage(dmg, this.player.x, time);
     this.juice.damageNumber(s.x, s.y - 26, dmg, crit ? 'purple' : 'orange', crit);
     this.juice.flash(s);

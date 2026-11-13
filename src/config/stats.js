@@ -11,6 +11,7 @@ export const BASE_STATS = {
   critChance: 0.15,  // chance of a crit (x1.6, purple numbers)
   speed: 175,        // run speed px/s
   jump: 560,         // jump impulse px/s (~3.5 tiles)
+  maxJumps: 2,       // jumps before touching ground again (2 = double jump)
   luck: 1.0,         // coin-drop multiplier from slimes
 };
 

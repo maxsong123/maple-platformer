@@ -60,7 +60,41 @@ export default class BootScene extends Phaser.Scene {
     a('puff', ['puff', [0, 1, 2, 3, 4, 5]], 18, 0);
     a('slash', ['slash', [0, 1, 2]], 24, 0);
 
+    this.makeItemTextures();
+
     const skip = new URLSearchParams(location.search).has('play');
     this.scene.start(skip ? 'Game' : 'Title');
+  }
+
+  /** Procedurally draw item/projectile sprites so the game stays asset-toolchain-free. */
+  makeItemTextures() {
+    const mk = (key, w, h, draw) => {
+      const g = this.add.graphics();
+      draw(g);
+      g.generateTexture(key, w, h);
+      g.destroy();
+    };
+    const flask = (key, liquid, shine) => mk(key, 14, 18, (g) => {
+      g.fillStyle(0x5a3a1e, 1); g.fillRect(5, 0, 4, 3);              // cork
+      g.fillStyle(0x1d2b53, 1); g.fillRect(4, 3, 6, 4);             // neck outline
+      g.fillStyle(0xeaf6ff, 1); g.fillRect(5, 4, 4, 2);             // neck glass
+      g.fillStyle(0x1d2b53, 1); g.fillRoundedRect(1, 6, 12, 11, 4); // body outline
+      g.fillStyle(liquid, 1);   g.fillRoundedRect(2, 7, 10, 9, 3);  // liquid
+      g.fillStyle(shine, 0.9);  g.fillRect(3, 8, 2, 4);             // shine streak
+      g.fillStyle(0xffffff, 0.6); g.fillRect(9, 12, 1, 2);          // speck
+    });
+    flask('potion', 0xff3b5c, 0xffd1dc);
+    flask('elixir', 0x3bc6ff, 0xd6f3ff);
+    mk('star_item', 16, 16, (g) => {
+      const c = 8;
+      const ring = (sc, color) => {
+        const pts = [[c, 0], [c + 2.4, c - 2.4], [16, c], [c + 2.4, c + 2.4], [c, 16], [c - 2.4, c + 2.4], [0, c], [c - 2.4, c - 2.4]]
+          .map(([x, y]) => ({ x: c + (x - c) * sc, y: c + (y - c) * sc }));
+        g.fillStyle(color, 1); g.fillPoints(pts, true);
+      };
+      ring(1, 0x1d2b53);      // navy outline
+      ring(0.82, 0xcfe8ff);   // steel body
+      g.fillStyle(0x1d2b53, 1); g.fillCircle(c, c, 1.6); // center hole
+    });
   }
 }

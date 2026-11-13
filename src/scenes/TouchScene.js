@@ -26,6 +26,7 @@ export default class TouchScene extends Phaser.Scene {
 
     this.stick = this.makeStick(this.baseX, this.baseY);
     this.btns = [
+      this.makeBtn('ranged', TOUCH_UI.attack.x, TOUCH_UI.attack.y - 68, 28, 'star', 44),
       this.makeBtn('attack', TOUCH_UI.attack.x, TOUCH_UI.attack.y, TOUCH_UI.attack.r, 'sword', TOUCH_UI.attack.hitR),
       this.makeBtn('jump', TOUCH_UI.jump.x, TOUCH_UI.jump.y, TOUCH_UI.jump.r, 'arrowU', TOUCH_UI.jump.hitR),
     ];
@@ -53,6 +54,7 @@ export default class TouchScene extends Phaser.Scene {
       if (this.hitBtn(b, ptr)) {
         if (b.key === 'jump') touch.jumpTap = true;
         if (b.key === 'attack') touch.attackTap = true;
+        if (b.key === 'ranged') touch.rangedTap = true;
         return; // a button ate this pointer; don't also grab the stick
       }
     }
@@ -184,8 +186,16 @@ export default class TouchScene extends Phaser.Scene {
       g.lineStyle(4, 0xffffff, 0.85).lineBetween(-s * 0.7, s * 0.7, s * 0.8, -s * 0.8);
       g.lineStyle(4, 0xffe066, 0.85).lineBetween(-s * 0.9, s * 0.1, -s * 0.1, s * 0.9);
     }
+    if (icon === 'star') {
+      const t = s * 0.95, w = s * 0.34;
+      g.fillStyle(0xcfe8ff, 0.9);
+      g.fillTriangle(0, -t, w, 0, -w, 0);
+      g.fillTriangle(0, t, w, 0, -w, 0);
+      g.fillTriangle(-t, 0, 0, w, 0, -w);
+      g.fillTriangle(t, 0, 0, w, 0, -w);
+    }
     c.add(g);
-    const label = { jump: 'JUMP', attack: 'ATK' }[key];
+    const label = { jump: 'JUMP', attack: 'ATK', ranged: 'THROW' }[key];
     if (label) c.add(this.add.text(0, r * 0.55, label, { fontFamily: 'PressStart', fontSize: '6px', color: '#ffffff' }).setOrigin(0.5).setAlpha(0.8));
     c.setAlpha(0.6);
     return { key, x, y, r, hitR, c, down: false };

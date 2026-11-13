@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_W, PROGRESSION, BOSS } from '../config/tuning.js';
+import { ITEMS, INV_ORDER } from '../config/items.js';
 import { isTouchDevice } from '../objects/TouchState.js';
 
 /** Overlay HUD: hearts, coin count, level + XP bar, boss HP bar, mute button. */
@@ -15,6 +16,20 @@ export default class HUDScene extends Phaser.Scene {
     this.hearts = [];
     for (let i = 0; i < game.stats.maxHp; i++) this.hearts.push(this.add.image(12 + i * 14, 12, 'heart', 0).setOrigin(0).setScale(1.2));
 
+    // ── inventory bar (second row, under the hearts). Tap a potion/elixir to use it.
+    this.lastInv = {};
+    this.invSlots = INV_ORDER.map((type, i) => {
+      const x = 10 + i * 46, y = 30;
+      const box = this.add.rectangle(x, y, 42, 20, 0x1d2b53, 0.55).setOrigin(0).setStrokeStyle(1, 0xffffff, 0.35);
+      const icon = this.add.image(x + 11, y + 10, ITEMS[type].icon);
+      const count = txt(x + 21, y + 6, 'x0', 8);
+      txt(x + 2, y + 1, ITEMS[type].hotkey, 6, '#ffe066');
+      if (ITEMS[type].usable) {
+        box.setInteractive({ useHandCursor: true }).on('pointerdown', () => game.useItem(type));
+      }
+      return { type, icon, count, box };
+    });
+
     this.coinIcon = this.add.sprite(GAME_W - 86, 18, 'coin').play('coin-spin');
     this.coinText = txt(GAME_W - 74, 11, '0', 10, '#ffe066');
 
@@ -26,8 +41,8 @@ export default class HUDScene extends Phaser.Scene {
     this.xpShine = this.add.rectangle(65, y, 0, 2, 0xfff6b0).setOrigin(0, 0.5);
     this.xpText = txt(GAME_W - 70, y - 2, '0%', 8);
     const touchDev = isTouchDevice();
-    this.hint = txt(12, 30, touchDev ? 'Left stick moves    JUMP    ATK swing' : 'ARROWS/WASD move  SPACE jump  X/J attack  M mute', 6, '#ffffffcc');
-    this.time.delayedCall(6000, () => this.tweens.add({ targets: this.hint, alpha: 0, duration: 600 }));
+    this.hint = txt(12, 54, touchDev ? 'Left stick moves | JUMP x2 | ATK | THROW star | tap potion to heal' : 'WASD move  SPACE double-jump  X attack  F throw star  1/2 heal  M mute', 6, '#ffffffcc');
+    this.time.delayedCall(7000, () => this.tweens.add({ targets: this.hint, alpha: 0, duration: 600 }));
 
     // tap-friendly mute toggle (top-right, under the coin counter)
     this.muteBtn = txt(GAME_W - 40, 30, this.registry.get('muted') ? 'SND:OFF' : 'SND:ON', 6, '#ffffffaa').setOrigin(1, 0)
@@ -103,6 +118,18 @@ export default class HUDScene extends Phaser.Scene {
       this.tweens.add({ targets: [this.coinText, this.coinIcon], scale: { from: 1.5, to: 1 }, duration: 180, ease: 'Back.Out' });
       this.lastCoins = g.run.coins;
     }
+    this.invSlots.forEach((s) => {
+      const n = g.inv.count(s.type);
+      if (this.lastInv[s.type] !== undefined && n !== this.lastInv[s.type]) {
+        this.tweens.add({ targets: s.icon, scale: { from: 1.7, to: 1 }, duration: 220, ease: 'Back.Out' });
+      }
+      this.lastInv[s.type] = n;
+      s.count.setText('x' + n);
+      const empty = n <= 0;
+      s.icon.setAlpha(empty ? 0.3 : 1);
+      s.count.setColor(empty ? '#7a86a8' : '#ffffff');
+    });
+
     const need = PROGRESSION.xpPerLevel(g.prog.level);
     const pct = Phaser.Math.Clamp(g.prog.xp / need, 0, 1);
     this.lvText.setText(`Lv.${g.prog.level}`);

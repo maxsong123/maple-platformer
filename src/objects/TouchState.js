@@ -10,8 +10,8 @@ export const TOUCH_UI = {
 
 export const touch = {
   enabled: false,
-  left: false, right: false, jump: false, attack: false,
-  jumpTap: false, attackTap: false,   // latched on pointerdown so very quick taps never get lost
+  left: false, right: false, jump: false, attack: false, ranged: false,
+  jumpTap: false, attackTap: false, rangedTap: false,   // latched on pointerdown so very quick taps never get lost
   axisX: 0,                           // -1..1, already dead-zoned (0 inside the dead zone)
   axisY: 0,                           // recorded but never used for jump
 };
@@ -24,8 +24,8 @@ export function isTouchDevice() {
 }
 
 export function resetTouch() {
-  touch.left = touch.right = touch.jump = touch.attack = false;
-  touch.jumpTap = touch.attackTap = false;
+  touch.left = touch.right = touch.jump = touch.attack = touch.ranged = false;
+  touch.jumpTap = touch.attackTap = touch.rangedTap = false;
   touch.axisX = 0;
   touch.axisY = 0;
 }
