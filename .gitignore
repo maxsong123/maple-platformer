@@ -1,0 +1,33 @@
+# dependencies & build
+node_modules/
+dist/
+.vercel/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# zips and one-off deploy payloads (do not commit)
+*.zip
+deploy-payload/
+
+# large test / gameplay recordings
+shots/*.mp4
+shots/*.webm
+
+# playwright / test artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+blob-report/
+/tmp/
+*.log
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
