@@ -13,8 +13,14 @@ export default class Controls {
     kb.addCapture([K.SPACE, K.UP, K.DOWN, K.LEFT, K.RIGHT]);
     this.prevTJ = false; this.prevTA = false;
   }
-  left() { return this.k.left.isDown || this.k.a.isDown || touch.left; }
-  right() { return this.k.right.isDown || this.k.d.isDown || touch.right; }
+  left() { return this.k.left.isDown || this.k.a.isDown || touch.left || touch.axisX < 0; }
+  right() { return this.k.right.isDown || this.k.d.isDown || touch.right || touch.axisX > 0; }
+  /** -1..1 analog move. Keyboard is digital; the virtual stick is analog past its dead zone. */
+  moveAxis() {
+    const k = (this.k.right.isDown || this.k.d.isDown ? 1 : 0) - (this.k.left.isDown || this.k.a.isDown ? 1 : 0);
+    if (k !== 0) return k;
+    return touch.axisX || 0;
+  }
   jumpHeld() { return this.k.space.isDown || this.k.up.isDown || this.k.w.isDown || this.k.z.isDown || touch.jump; }
   jumpPressed() {
     const J = Phaser.Input.Keyboard.JustDown;

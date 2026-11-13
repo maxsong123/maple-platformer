@@ -59,7 +59,7 @@ export default class GameScene extends Phaser.Scene {
 
     // debug hooks for automated testing (?debug)
     if (new URLSearchParams(location.search).has('debug')) {
-      window.__debug = {
+      window.__debug = Object.assign(window.__debug || {}, {
         scene: this,
         teleport: (tx, ty = 6) => { this.player.setPosition(tx * TILE, ty * TILE); this.player.body.setVelocity(0, 0); },
         killPlayer: () => this.hurtPlayer(99, this.player.x + 1, this.time.now, true),
@@ -70,7 +70,7 @@ export default class GameScene extends Phaser.Scene {
           boss: this.boss ? { hp: this.boss.hp, max: this.boss.maxHp, state: this.boss.state, enraged: this.boss.enraged, x: Math.round(this.boss.x), dead: this.boss.dead } : null,
           minis: this.slimes.filter((z) => z.mini && !z.dead).length, completed: this.completed, hurtBy: this.run.hurtBy || {},
         }),
-      };
+      });
     }
   }
 

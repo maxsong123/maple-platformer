@@ -29,7 +29,7 @@ export default class TitleScene extends Phaser.Scene {
       fontFamily: 'PressStart', fontSize: '10px', color: '#ffffff', stroke: '#1d2b53', strokeThickness: 5,
     }).setOrigin(0.5);
     this.tweens.add({ targets: press, alpha: 0.25, yoyo: true, repeat: -1, duration: 550 });
-    this.add.text(GAME_W / 2, 194, touchDev ? 'on-screen buttons: move  JUMP  ATK' : 'ARROWS/WASD move   SPACE jump   X/J attack', {
+    this.add.text(GAME_W / 2, 194, touchDev ? 'left stick to move    JUMP    ATK' : 'ARROWS/WASD move   SPACE jump   X/J attack', {
       fontFamily: 'PressStart', fontSize: '7px', color: '#1d2b53',
     }).setOrigin(0.5);
 

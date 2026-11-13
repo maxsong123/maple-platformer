@@ -26,7 +26,7 @@ export default class HUDScene extends Phaser.Scene {
     this.xpShine = this.add.rectangle(65, y, 0, 2, 0xfff6b0).setOrigin(0, 0.5);
     this.xpText = txt(GAME_W - 70, y - 2, '0%', 8);
     const touchDev = isTouchDevice();
-    this.hint = txt(12, 30, touchDev ? 'Thumbs: < > move   JUMP   ATK swing' : 'ARROWS/WASD move  SPACE jump  X/J attack  M mute', 6, '#ffffffcc');
+    this.hint = txt(12, 30, touchDev ? 'Left stick moves    JUMP    ATK swing' : 'ARROWS/WASD move  SPACE jump  X/J attack  M mute', 6, '#ffffffcc');
     this.time.delayedCall(6000, () => this.tweens.add({ targets: this.hint, alpha: 0, duration: 600 }));
 
     // tap-friendly mute toggle (top-right, under the coin counter)
